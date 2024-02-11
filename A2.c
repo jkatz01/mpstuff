@@ -76,7 +76,6 @@ int find_b_index(int max_a, int* data_b, int start, int b_size) {
 	// Cover duplicates
 	while (low < b_size) {
 		if (data_b[low] <= max_a) {
-			//printf("\neq\n");
 			low++;
 		}
 		else {
@@ -94,15 +93,14 @@ void merge_arrays(const int* data_a, const int* data_b, int* data_c, int a_size,
 	int i = 0;
 	int j = 0;
 	while (k < a_size + b_size) {
-		if (i >= a_size) {
-			data_c[k] = data_b[j];
-			j++;
+		if (i > a_size) {
+			break;
 		}
-		else if (j >= b_size) {
-			data_c[k] = data_b[i];
-			i++;
+		if (j > b_size) {
+			break;
 		}
-		else if (data_a[i] <= data_b[j]) {
+
+		if (data_a[i] <= data_b[j]) {
 			data_c[k] = data_a[i];
 			i++;
 		}
@@ -110,10 +108,22 @@ void merge_arrays(const int* data_a, const int* data_b, int* data_c, int a_size,
 			data_c[k] = data_b[j];
 			j++;
 		}
-		printf("E: %d ", data_c[k]);
 		k++;
 	}
-	printf("\n");
+	if (i > a_size) {
+		while (k < a_size + b_size) {
+			data_c[k] = data_b[j];
+			j++;
+			k++;
+		}
+	}
+	if (j > b_size) {
+		while (k < a_size + b_size) {
+			data_c[k] = data_a[i];
+			i++;
+			k++;
+		}
+	}
 }
 
 int main (int argc, char *argv[]) {
