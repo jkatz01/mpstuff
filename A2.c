@@ -92,36 +92,31 @@ void merge_arrays(const int* data_a, const int* data_b, int* data_c, int a_size,
 	int k = 0;
 	int i = 0;
 	int j = 0;
-	while (k < a_size + b_size) {
-		if (i > a_size) {
-			break;
-		}
-		if (j > b_size) {
-			break;
-		}
 
-		if (data_a[i] <= data_b[j]) {
+	while (i < a_size && j < b_size) {
+		if (data_a[i] < data_b[j]) {
 			data_c[k] = data_a[i];
+			k++;
 			i++;
 		}
 		else {
 			data_c[k] = data_b[j];
+			k++;
 			j++;
 		}
-		k++;
 	}
-	if (i > a_size) {
-		while (k < a_size + b_size) {
+	if (i == a_size) {
+		while (j < b_size) {
 			data_c[k] = data_b[j];
-			j++;
 			k++;
+			j++;
 		}
 	}
-	if (j > b_size) {
-		while (k < a_size + b_size) {
+	if (j == b_size) {
+		while (i < a_size) {
 			data_c[k] = data_a[i];
-			i++;
 			k++;
+			i++;
 		}
 	}
 }
