@@ -3,6 +3,7 @@
 #include "mpi.h"
 
 #define RAND_INC 7
+#define FIRST    0
 
 enum Tags {
 	TAG_CHUNK_START,
@@ -69,6 +70,8 @@ int main (int argc, char *argv[]) {
 	int*	data_b;
 	int*	data_a_sizes;
 	int*	data_b_sizes;
+	int*	data_a_indices;
+	int*	data_b_indices; //equivalent to j() in algorithm
 
 	if (argc != 2) {
 		data_size = 10;
@@ -87,8 +90,9 @@ int main (int argc, char *argv[]) {
 
 
 	data_a_sizes = (int*)malloc(num_procs * sizeof(int));
+	data_a_indices = (int*)malloc(num_procs * sizeof(int));
 	
-	if (my_rank == 0) {
+	if (my_rank == FIRST) {
 
 		data_a = (int*)malloc(data_size * sizeof(int));
 		data_b = (int*)malloc(data_size * sizeof(int));
@@ -97,6 +101,12 @@ int main (int argc, char *argv[]) {
 
 		partition_array(data_size, num_procs, data_a_sizes);
 
+		int sum = 0;
+		for (int i = 0; i < num_procs; i++) {
+			// calculate A indices
+			data_a_indices[i] = sum;
+			sum += data_a_sizes[i];
+		}
 		// Insert given message to appropriate location
 		// Change to MPI Broadcast?
 
@@ -105,6 +115,12 @@ int main (int argc, char *argv[]) {
 	MPI_Barrier(MPI_COMM_WORLD);
 	MPI_Bcast(data_a_sizes, data_size, MPI_INT, 0, MPI_COMM_WORLD);
 	print_array(data_a_sizes, num_procs);
+	int my_a_size = data_a_sizes[my_rank];
+	int* receive_a_buffer = (int*)malloc(my_a_size);
+
+	MPI_Scatterv(data_a, data_a_sizes, data_a_indices, MPI_INT, receive_a_buffer, my_a_size, MPI_INT, FIRST, MPI_COMM_WORLD);
+
+	// Get our chunk of data_a so we can find the indices for data_b 
 
 	MPI_Finalize();
 
