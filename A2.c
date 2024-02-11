@@ -53,27 +53,26 @@ int main (int argc, char *argv[]) {
 	int* data_b;
 	data_size = 10;
 
+	data_a = (int*)malloc(data_size * sizeof(int));
+	data_b = (int*)malloc(data_size * sizeof(int));
+	
 	if (my_rank == 0) {
 
-		data_a = (int*)malloc(data_size * sizeof(int));
-		data_b = (int*)malloc(data_size * sizeof(int));
 
 		generate_arrays(data_a, data_b, data_size);
 		
 		// Insert given message to appropriate location
 		for (source = 1; source < procs; source++) {
-			MPI_Send(&data_a, data_size, MPI_INT, source, tag, MPI_COMM_WORLD);
-			//MPI_Recv(&sum, SIZE_D, MPI_INT, source, tag, MPI_COMM_WORLD, &status);
+			MPI_Send(data_a, data_size, MPI_INT, source, tag, MPI_COMM_WORLD);
 		}
 	}
 	else {
-		//MPI_Send(&sum, SIZE_D, MPI_INT, dest, tag, MPI_COMM_WORLD);
-		MPI_Recv(&data_a, data_size, MPI_INT, 0, tag, MPI_COMM_WORLD, &status);
+		MPI_Recv(data_a, data_size, MPI_INT, 0, tag, MPI_COMM_WORLD, &status);
 		for (int i = 0; i < data_size; i++) {
 			printf("%d, ", data_a[i]);
 		}
-		printf("\n");
-	}
+		printf("\n"); 
+	} 
 
 	MPI_Finalize();
 
