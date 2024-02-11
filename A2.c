@@ -1,21 +1,22 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "mpi.h"
 
-#define SIZE_D 6
-#define SIZE_C (SIZE_A + SIZE_B)
+#define RAND_INC 7
+
+int binary_search(const int *data, int start, int end);
+void generate_arrays(int* array_a, int* array_b, int size);
 
 int main (int argc, char *argv[]) {
 	int	my_rank;
-	int	p;
+	int	procs;
 	int	source;
 	int	dest;
 	int	tag = 0;
+	int	data_size;
 	
 	// Randomly generate these arrays
 	// Can we do this with shared memory?
-	int	data_a[SIZE_D] = {12, 13, 26, 40, 55, 71};
-	int	data_b[SIZE_D] = { 5, 19, 21, 50, 51, 90};
-	int	sum = 0;
 
 	MPI_Status status;
 
@@ -23,7 +24,7 @@ int main (int argc, char *argv[]) {
 
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-	MPI_Comm_size(MPI_COMM_WORLD, &p);
+	MPI_Comm_size(MPI_COMM_WORLD, &procs);
 
 	// Partition A into r groups
 	// each with k = logn elements
@@ -48,20 +49,30 @@ int main (int argc, char *argv[]) {
 	// This guarantees that the elments of B have
 	// reached their final position in C(1:2n)
 
+	int* data_a;
+	int* data_b;
+	data_size = 10;
 
 	if (my_rank == 0) {
+
+		data_a = (int*)malloc(data_size * sizeof(int));
+		data_b = (int*)malloc(data_size * sizeof(int));
+
+		generate_arrays(data_a, data_b, data_size);
+		
 		// Insert given message to appropriate location
-		for (source = 1; source < p; source++) {
-			MPI_Recv(&sum, SIZE_D, MPI_INT, source, tag, MPI_COMM_WORLD, &status);
-			printf("Sum: %d\n", sum);
+		for (source = 1; source < procs; source++) {
+			MPI_Send(&data_a, data_size, MPI_INT, source, tag, MPI_COMM_WORLD);
+			//MPI_Recv(&sum, SIZE_D, MPI_INT, source, tag, MPI_COMM_WORLD, &status);
 		}
 	}
 	else {
-		for (int i = 0; i < SIZE_D; i++) {
-			sum += data_a[i];
+		//MPI_Send(&sum, SIZE_D, MPI_INT, dest, tag, MPI_COMM_WORLD);
+		MPI_Recv(&data_a, data_size, MPI_INT, 0, tag, MPI_COMM_WORLD, &status);
+		for (int i = 0; i < data_size; i++) {
+			printf("%d, ", data_a[i]);
 		}
-		dest = 0;
-		MPI_Send(&sum, SIZE_D, MPI_INT, dest, tag, MPI_COMM_WORLD);
+		printf("\n");
 	}
 
 	MPI_Finalize();
@@ -73,4 +84,15 @@ int main (int argc, char *argv[]) {
 int binary_search(const int *data, int start, int end) {
 	int index = 0;
 	return index;
+}
+
+void generate_arrays(int* data_a, int* data_b, int size) {
+	int cur_a = 0;
+	int cur_b = 0;
+	for (int i = 0; i < size; i++) {
+		cur_a += rand() % RAND_INC;
+		cur_b += rand() % RAND_INC;
+		data_a[i] = cur_a;
+		data_b[i] = cur_b;
+	}
 }
