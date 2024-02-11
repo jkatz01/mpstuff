@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "mpi.h"
 
-#define RAND_INC 7
+#define RAND_INC 6
 #define FIRST    0
 
 enum Tags {
@@ -21,8 +21,6 @@ void generate_arrays(int* data_a, int* data_b, int size) {
 	}
 }
 
-/* chunk_sizes must have total_procs - 1 elements because 
- * process 0 is not being used				*/
 void partition_array(int data_size, int num_procs, int* chunks) {
 	/* chunk_sizes must have total num of procs elements
 	
@@ -44,9 +42,10 @@ void partition_array(int data_size, int num_procs, int* chunks) {
 
 }
 
-void print_array(int* data, int size) {
+void print_array(int* data, int size, const char* prefix) {
+	printf("%s", prefix);
 	for (int i = 0; i < size; i++) {
-		printf("%d", data[i]);
+		printf("%3d", data[i]);
 		if (i < size-1) {
 			printf(", ");
 		}
@@ -57,6 +56,7 @@ void print_array(int* data, int size) {
 int find_b_index(int max_a, int* data_b, int start, int b_size) {
 	// uses binary search to find the greated j
 	// that is smaller or equal to max_a
+	printf("Max: %d Start: %d Size: %d", max_a, start, b_size);
 	int middle, low, high;
 	low = start; // start is the previous j()
 	high = b_size - 1;
@@ -73,9 +73,21 @@ int find_b_index(int max_a, int* data_b, int start, int b_size) {
 			high = middle;
 		}
 	}
+
+	while (low < b_size) {
+		if (data_b[low] <= max_a) {
+			printf("\neq\n");
+			low++;
+		}
+		else {
+			break;
+		}
+	}
+
 	// this returns -1 if there is no element
 	// in B that is <= max_a
-	return low - 1;
+	printf("Low: %d\n", low-1);
+	return low-1;
 }
 
 int main (int argc, char *argv[]) {
@@ -91,6 +103,7 @@ int main (int argc, char *argv[]) {
 	int*	data_b_sizes;
 	int*	data_a_indices;
 	int*	data_b_indices; //equivalent to j() in algorithm
+	int*	data_b_displs;
 
 	if (argc != 2) {
 		data_size = 10;
@@ -108,9 +121,11 @@ int main (int argc, char *argv[]) {
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
 
-	data_a_sizes = (int*)malloc(num_procs * sizeof(int));
+	data_a_sizes   = (int*)malloc(num_procs * sizeof(int));
 	data_a_indices = (int*)malloc(num_procs * sizeof(int));
+	data_b_sizes   = (int*)malloc(num_procs * sizeof(int));
 	data_b_indices = (int*)malloc(num_procs * sizeof(int));
+	data_b_displs  = (int*)malloc(num_procs * sizeof(int));
 	
 	if (my_rank == FIRST) {
 
@@ -122,7 +137,8 @@ int main (int argc, char *argv[]) {
 		partition_array(data_size, num_procs, data_a_sizes);
 
 		int sum = 0;
-		for (int i = 0; i < num_procs; i++) {
+		int i = 0;
+		for (i = 0; i < num_procs; i++) {
 			// calculate A indices
 			data_a_indices[i] = sum;
 			sum += data_a_sizes[i];
@@ -130,29 +146,47 @@ int main (int argc, char *argv[]) {
 		// Insert given message to appropriate location
 		// Change to MPI Broadcast?
 		//
-		print_array(data_a, data_size);
-		print_array(data_b, data_size);
+		print_array(data_a, data_size, "A: ");
+		print_array(data_b, data_size, "B: ");
 
-		for (int j = 0; j < num_procs; j++) {
-			int cur_idx = data_a_indices[j];
-			int cur_size = data_a_sizes[j];
-			data_b_indices[j] = find_b_index(data_a[cur_idx + cur_size], data_b, cur_idx, data_size);
+		int previous_index = -1; //j()
+		for (i = 0; i < num_procs; i++) {
+			int cur_idx = data_a_indices[i];
+			int cur_size = data_a_sizes[i];
+			data_b_displs[i] = previous_index + 1; //displacements should start at 0 but indices are the max indices
+			data_b_indices[i] = find_b_index(data_a[cur_idx + cur_size - 1], data_b, previous_index + 1, data_size);
+			previous_index = data_b_indices[i];
 		}
 
-		print_array(data_b_indices, num_procs);
+		int prev = -1; //first size includes 0
+		for (i = 0; i < num_procs; i++) {
+			data_b_sizes[i] = data_b_indices[i] - prev;
+			prev = data_b_indices[i];
+		}
+
+		
+		print_array(data_b_indices, num_procs, "j() indices: ");
+		print_array(data_b_sizes, num_procs, "j() sizes: ");
 
 	}
 	
+	MPI_Bcast(data_a_sizes, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(data_b_sizes, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Barrier(MPI_COMM_WORLD);
-	MPI_Bcast(data_a_sizes, data_size, MPI_INT, 0, MPI_COMM_WORLD);
 	
 	int my_a_size = data_a_sizes[my_rank];
+	int my_b_size = data_b_sizes[my_rank];
 	int* recv_a_buffer = (int*)malloc(my_a_size);
+	int* recv_b_buffer = (int*)malloc(my_b_size);
 
 	MPI_Scatterv(data_a, data_a_sizes, data_a_indices, MPI_INT, recv_a_buffer, my_a_size, MPI_INT, FIRST, MPI_COMM_WORLD);
+	MPI_Scatterv(data_b, data_b_sizes, data_b_displs, MPI_INT, recv_b_buffer, my_b_size, MPI_INT, FIRST, MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	printf("[%d]: ", my_rank);
-	print_array(recv_a_buffer, my_a_size);
+	print_array(recv_a_buffer, my_a_size, "My A: ");
+	printf("[%d]: ", my_rank);
+	print_array(recv_b_buffer, my_b_size, "My B: ");
 
 	
 	MPI_Finalize();
