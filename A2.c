@@ -3,8 +3,16 @@
 #include "mpi.h"
 
 #define RAND_INC 7
-#define TAG_PART 0
 
+enum Tags {
+	TAG_CHUNK_START,
+	TAG_CHUNK_END
+};
+
+typedef struct Chunk {
+	int start;
+	int end;
+} Chunk;
 
 int binary_search(const int *data, int start, int end) {
 	int index = 0;
@@ -22,7 +30,9 @@ void generate_arrays(int* data_a, int* data_b, int size) {
 	}
 }
 
-void partition_array(int data_size, int num_procs, int* chunk_sizes) {
+/* chunk_sizes must have total_procs - 1 elements because 
+ * process 0 is not being used				*/
+void partition_array(int data_size, int num_procs, Chunk* chunks) {
 	/* chunk_sizes must have total num of procs - 1 elements
 	 * because process 0 is not used
 	
@@ -33,15 +43,19 @@ void partition_array(int data_size, int num_procs, int* chunk_sizes) {
 	
 	int remainder = data_size % num_procs;
 	int initial = data_size / num_procs;
+	int count = 0;
 
 	printf("Partitioning array into %d chunks\n", num_procs);
 
 	for (int i = 0; i < num_procs; i++) {
-		chunk_sizes[i] = initial;
+		chunks[i].start = count;
+		chunks[i].end = count + initial - 1;
 		if (remainder > 0) {
-			chunk_sizes[i] += 1;
+			chunks[i].end += 1;
 			remainder--;
+			count++;
 		}
+		count += initial;
 	}
 
 }
@@ -66,9 +80,6 @@ int main (int argc, char *argv[]) {
 	int*	data_a;
 	int*	data_b;
 
-	// Randomly generate these arrays
-	// Can we do this with shared memory?
-
 	MPI_Status status;
 
 	MPI_Init(&argc, &argv);
@@ -78,30 +89,33 @@ int main (int argc, char *argv[]) {
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
 
-
-	data_a = (int*)malloc(data_size * sizeof(int));
-	data_b = (int*)malloc(data_size * sizeof(int));
+	// Allocate memory for entire data_a and data_b
+	// only in first process and only allocate 
+	// partition in each other process????
 	int active_procs = num_procs - 1;
 	
 	if (my_rank == 0) {
 
+		data_a = (int*)malloc(data_size * sizeof(int));
+		data_b = (int*)malloc(data_size * sizeof(int));
+
 		generate_arrays(data_a, data_b, data_size);
 
-		int *chunk_sizes = (int*)malloc(active_procs * sizeof(int));
+		Chunk *chunks = (Chunk*)malloc(active_procs * sizeof(int));
 
-		partition_array(data_size, active_procs, chunk_sizes);
+		partition_array(data_size, active_procs, chunks);
 
-		printf("Array partitions: ");
-		print_array(chunk_sizes, active_procs);
-		
 		// Insert given message to appropriate location
-		for (source = 1; source < num_procs; source++) {
-			MPI_Send(data_a, data_size, MPI_INT, source, TAG_PART, MPI_COMM_WORLD);
+		for (dest = 1; dest < num_procs; dest++) {
+			MPI_Send(&chunks[dest - 1].start, 1, MPI_INT, dest, TAG_CHUNK_START, MPI_COMM_WORLD);
+			MPI_Send(&chunks[dest - 1].end, 1, MPI_INT, dest, TAG_CHUNK_END, MPI_COMM_WORLD);
 		}
 	}
 	else {
-		MPI_Recv(data_a, data_size, MPI_INT, 0, TAG_PART, MPI_COMM_WORLD, &status);
-		//print_array(data_a, data_size);
+		Chunk my_indices;
+		MPI_Recv(&my_indices.start, 1, MPI_INT, 0, TAG_CHUNK_START, MPI_COMM_WORLD, &status);
+		MPI_Recv(&my_indices.end, 1, MPI_INT, 0, TAG_CHUNK_END, MPI_COMM_WORLD, &status);
+		printf("My (%d) indices: %d, %d\n",my_rank, my_indices.start, my_indices.end);
 	} 
 
 	MPI_Finalize();
@@ -130,8 +144,4 @@ int main (int argc, char *argv[]) {
 	//
 	// This guarantees that the elments of B have
 	// reached their final position in C(1:2n)
-	//
-	// Allocate memory for entire data_a and data_b
-	// only in first process and only allocate 
-	// partition in each other process?
 }
