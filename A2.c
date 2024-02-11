@@ -9,11 +9,6 @@ enum Tags {
 	TAG_CHUNK_END
 };
 
-typedef struct Chunk {
-	int start;
-	int end;
-} Chunk;
-
 int binary_search(const int *data, int start, int end) {
 	int index = 0;
 	return index;
@@ -32,9 +27,8 @@ void generate_arrays(int* data_a, int* data_b, int size) {
 
 /* chunk_sizes must have total_procs - 1 elements because 
  * process 0 is not being used				*/
-void partition_array(int data_size, int num_procs, Chunk* chunks) {
-	/* chunk_sizes must have total num of procs - 1 elements
-	 * because process 0 is not used
+void partition_array(int data_size, int num_procs, int* chunks) {
+	/* chunk_sizes must have total num of procs elements
 	
 	*  determine the size of each 
 	*  chunk, and then incrementally
@@ -43,19 +37,13 @@ void partition_array(int data_size, int num_procs, Chunk* chunks) {
 	
 	int remainder = data_size % num_procs;
 	int initial = data_size / num_procs;
-	int count = 0;
-
-	printf("Partitioning array into %d chunks\n", num_procs);
 
 	for (int i = 0; i < num_procs; i++) {
-		chunks[i].start = count;
-		chunks[i].end = count + initial - 1;
+		chunks[i] = initial;
 		if (remainder > 0) {
-			chunks[i].end += 1;
+			chunks[i] += 1;
 			remainder--;
-			count++;
 		}
-		count += initial;
 	}
 
 }
@@ -75,10 +63,17 @@ int main (int argc, char *argv[]) {
 	int	num_procs;
 	int	source;
 	int	dest;
-	int	data_size = 10;
+	int	data_size;
 	int	k;
 	int*	data_a;
 	int*	data_b;
+
+	if (argc != 2) {
+		data_size = 10;
+	}
+	else {
+		data_size = atoi(argv[1]);
+	}
 
 	MPI_Status status;
 
@@ -89,11 +84,6 @@ int main (int argc, char *argv[]) {
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
 
-	// Allocate memory for entire data_a and data_b
-	// only in first process and only allocate 
-	// partition in each other process????
-	int active_procs = num_procs - 1;
-	
 	if (my_rank == 0) {
 
 		data_a = (int*)malloc(data_size * sizeof(int));
@@ -101,26 +91,31 @@ int main (int argc, char *argv[]) {
 
 		generate_arrays(data_a, data_b, data_size);
 
-		Chunk *chunks = (Chunk*)malloc(active_procs * sizeof(int));
+		int *sizes_a = (int*)malloc(num_procs * sizeof(int));
 
-		partition_array(data_size, active_procs, chunks);
+		partition_array(data_size, num_procs, sizes_a);
+		print_array(sizes_a, num_procs);
 
 		// Insert given message to appropriate location
-		for (dest = 1; dest < num_procs; dest++) {
-			MPI_Send(&chunks[dest - 1].start, 1, MPI_INT, dest, TAG_CHUNK_START, MPI_COMM_WORLD);
-			MPI_Send(&chunks[dest - 1].end, 1, MPI_INT, dest, TAG_CHUNK_END, MPI_COMM_WORLD);
-		}
+		// Change to MPI Broadcast?
+
+
 	}
 	else {
-		Chunk my_indices;
-		MPI_Recv(&my_indices.start, 1, MPI_INT, 0, TAG_CHUNK_START, MPI_COMM_WORLD, &status);
-		MPI_Recv(&my_indices.end, 1, MPI_INT, 0, TAG_CHUNK_END, MPI_COMM_WORLD, &status);
-		printf("My (%d) indices: %d, %d\n",my_rank, my_indices.start, my_indices.end);
+		
+		// find integers j(1) ... j(r)
+		// j(my) is greatest index so A[my_end] >= B[j(my)]
+		// Then send them to process 0 so we can get our part
+		// of arrays A and B
+		// MPI Scatterv also sends to process 0 so we need 
+		// to do all these calculations outside this if else?
 	} 
 
 	MPI_Finalize();
 
 	return 0;
+
+	// TODO: use proper logging instead of printing to console
 
 	// Partition A into r groups
 	// each with k = logn elements
