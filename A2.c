@@ -10,11 +10,6 @@ enum Tags {
 	TAG_CHUNK_END
 };
 
-int binary_search(const int *data, int start, int end) {
-	int index = 0;
-	return index;
-}
-
 void generate_arrays(int* data_a, int* data_b, int size) {
 	int cur_a = 0;
 	int cur_b = 0;
@@ -59,6 +54,30 @@ void print_array(int* data, int size) {
 	printf("\n");
 }
 
+int find_b_index(int max_a, int* data_b, int start, int b_size) {
+	// uses binary search to find the greated j
+	// that is smaller or equal to max_a
+	int middle, low, high;
+	low = start; // start is the previous j()
+	high = b_size - 1;
+	while (low < high) {
+		middle = low + (high - low) / 2;
+
+		if (data_b[middle] == max_a) {
+			return middle;
+		}
+		if (data_b[middle] < max_a + 1) {
+			low = middle + 1;
+		}
+		else {
+			high = middle;
+		}
+	}
+	// this returns -1 if there is no element
+	// in B that is <= max_a
+	return low - 1;
+}
+
 int main (int argc, char *argv[]) {
 	int	my_rank;
 	int	num_procs;
@@ -91,6 +110,7 @@ int main (int argc, char *argv[]) {
 
 	data_a_sizes = (int*)malloc(num_procs * sizeof(int));
 	data_a_indices = (int*)malloc(num_procs * sizeof(int));
+	data_b_indices = (int*)malloc(num_procs * sizeof(int));
 	
 	if (my_rank == FIRST) {
 
@@ -109,19 +129,32 @@ int main (int argc, char *argv[]) {
 		}
 		// Insert given message to appropriate location
 		// Change to MPI Broadcast?
+		//
+		print_array(data_a, data_size);
+		print_array(data_b, data_size);
+
+		for (int j = 0; j < num_procs; j++) {
+			int cur_idx = data_a_indices[j];
+			int cur_size = data_a_sizes[j];
+			data_b_indices[j] = find_b_index(data_a[cur_idx + cur_size], data_b, cur_idx, data_size);
+		}
+
+		print_array(data_b_indices, num_procs);
 
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
 	MPI_Bcast(data_a_sizes, data_size, MPI_INT, 0, MPI_COMM_WORLD);
-	print_array(data_a_sizes, num_procs);
+	
 	int my_a_size = data_a_sizes[my_rank];
-	int* receive_a_buffer = (int*)malloc(my_a_size);
+	int* recv_a_buffer = (int*)malloc(my_a_size);
 
-	MPI_Scatterv(data_a, data_a_sizes, data_a_indices, MPI_INT, receive_a_buffer, my_a_size, MPI_INT, FIRST, MPI_COMM_WORLD);
+	MPI_Scatterv(data_a, data_a_sizes, data_a_indices, MPI_INT, recv_a_buffer, my_a_size, MPI_INT, FIRST, MPI_COMM_WORLD);
 
-	// Get our chunk of data_a so we can find the indices for data_b 
+	printf("[%d]: ", my_rank);
+	print_array(recv_a_buffer, my_a_size);
 
+	
 	MPI_Finalize();
 
 	return 0;
