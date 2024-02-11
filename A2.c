@@ -63,7 +63,7 @@ int find_b_index(int max_a, int* data_b, int start, int b_size) {
 		middle = low + (high - low) / 2;
 
 		if (data_b[middle] == max_a) {
-			return middle;
+			break;
 		}
 		if (data_b[middle] < max_a + 1) {
 			low = middle + 1;
@@ -235,6 +235,10 @@ int main (int argc, char *argv[]) {
 	print_array(recv_b_buffer, my_b_size, "My B: ");
 
 	int* my_data_c = (int*)malloc(my_c_size * sizeof(int));
+
+	// Here's the actual parallel part of this problem
+	// I don't know how to calculate j() in parallel without
+	// copying the entire B array for every process
 	merge_arrays(recv_a_buffer, recv_b_buffer, my_data_c, my_a_size, my_b_size);
 	print_array(my_data_c, my_c_size, "My C: ");
 
