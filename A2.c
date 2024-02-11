@@ -67,6 +67,8 @@ int main (int argc, char *argv[]) {
 	int	k;
 	int*	data_a;
 	int*	data_b;
+	int*	data_a_sizes;
+	int*	data_b_sizes;
 
 	if (argc != 2) {
 		data_size = 10;
@@ -84,6 +86,8 @@ int main (int argc, char *argv[]) {
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
 
+	data_a_sizes = (int*)malloc(num_procs * sizeof(int));
+	
 	if (my_rank == 0) {
 
 		data_a = (int*)malloc(data_size * sizeof(int));
@@ -91,25 +95,16 @@ int main (int argc, char *argv[]) {
 
 		generate_arrays(data_a, data_b, data_size);
 
-		int *sizes_a = (int*)malloc(num_procs * sizeof(int));
-
-		partition_array(data_size, num_procs, sizes_a);
-		print_array(sizes_a, num_procs);
+		partition_array(data_size, num_procs, data_a_sizes);
 
 		// Insert given message to appropriate location
 		// Change to MPI Broadcast?
 
-
 	}
-	else {
-		
-		// find integers j(1) ... j(r)
-		// j(my) is greatest index so A[my_end] >= B[j(my)]
-		// Then send them to process 0 so we can get our part
-		// of arrays A and B
-		// MPI Scatterv also sends to process 0 so we need 
-		// to do all these calculations outside this if else?
-	} 
+	
+	MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Bcast(data_a_sizes, data_size, MPI_INT, 0, MPI_COMM_WORLD);
+	print_array(data_a_sizes, num_procs);
 
 	MPI_Finalize();
 
