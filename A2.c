@@ -23,7 +23,8 @@ void generate_arrays(int* data_a, int* data_b, int size) {
 }
 
 void partition_array(int data_size, int num_procs, int* chunk_sizes) {
-	/* chunk_sizes must have num_procs elements
+	/* chunk_sizes must have total num of procs - 1 elements
+	 * because process 0 is not used
 	
 	*  determine the size of each 
 	*  chunk, and then incrementally
@@ -32,6 +33,8 @@ void partition_array(int data_size, int num_procs, int* chunk_sizes) {
 	
 	int remainder = data_size % num_procs;
 	int initial = data_size / num_procs;
+
+	printf("Partitioning array into %d chunks\n", num_procs);
 
 	for (int i = 0; i < num_procs; i++) {
 		chunk_sizes[i] = initial;
@@ -74,6 +77,37 @@ int main (int argc, char *argv[]) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
+
+
+	data_a = (int*)malloc(data_size * sizeof(int));
+	data_b = (int*)malloc(data_size * sizeof(int));
+	int active_procs = num_procs - 1;
+	
+	if (my_rank == 0) {
+
+		generate_arrays(data_a, data_b, data_size);
+
+		int *chunk_sizes = (int*)malloc(active_procs * sizeof(int));
+
+		partition_array(data_size, active_procs, chunk_sizes);
+
+		printf("Array partitions: ");
+		print_array(chunk_sizes, active_procs);
+		
+		// Insert given message to appropriate location
+		for (source = 1; source < num_procs; source++) {
+			MPI_Send(data_a, data_size, MPI_INT, source, TAG_PART, MPI_COMM_WORLD);
+		}
+	}
+	else {
+		MPI_Recv(data_a, data_size, MPI_INT, 0, TAG_PART, MPI_COMM_WORLD, &status);
+		//print_array(data_a, data_size);
+	} 
+
+	MPI_Finalize();
+
+	return 0;
+
 	// Partition A into r groups
 	// each with k = logn elements
 	// Group 1: A[1]	... A[k]
@@ -100,34 +134,4 @@ int main (int argc, char *argv[]) {
 	// Allocate memory for entire data_a and data_b
 	// only in first process and only allocate 
 	// partition in each other process?
-
-
-	data_a = (int*)malloc(data_size * sizeof(int));
-	data_b = (int*)malloc(data_size * sizeof(int));
-	
-	if (my_rank == 0) {
-
-		generate_arrays(data_a, data_b, data_size);
-
-		int *chunk_sizes = (int*)malloc(num_procs * sizeof(int));
-
-		partition_array(data_size, num_procs, chunk_sizes);
-
-		printf("Array partitions: ");
-		print_array(chunk_sizes, num_procs);
-		
-		// Insert given message to appropriate location
-		for (source = 1; source < num_procs; source++) {
-			MPI_Send(data_a, data_size, MPI_INT, source, TAG_PART, MPI_COMM_WORLD);
-		}
-	}
-	else {
-		MPI_Recv(data_a, data_size, MPI_INT, 0, TAG_PART, MPI_COMM_WORLD, &status);
-		//print_array(data_a, data_size);
-	} 
-
-	MPI_Finalize();
-
-	return 0;
-
 }
