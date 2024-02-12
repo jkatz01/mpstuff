@@ -154,7 +154,7 @@ int main (int argc, char *argv[]) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
-
+	// This really should just be a struct lmao
 	data_a_sizes   = (int*)malloc(num_procs * sizeof(int));
 	data_a_indices = (int*)malloc(num_procs * sizeof(int));
 	data_b_sizes   = (int*)malloc(num_procs * sizeof(int));
@@ -182,8 +182,8 @@ int main (int argc, char *argv[]) {
 		// Insert given message to appropriate location
 		// Change to MPI Broadcast?
 		//
-		print_array(data_a, data_size, "A: ");
-		print_array(data_b, data_size, "B: ");
+		//print_array(data_a, data_size, "A: ");
+		//print_array(data_b, data_size, "B: ");
 
 		int previous_index = -1; //j()
 		for (i = 0; i < num_procs; i++) {
@@ -213,26 +213,33 @@ int main (int argc, char *argv[]) {
 		//print_array(data_b_sizes, num_procs, "j() sizes: ");
 
 	}
-	
-	MPI_Bcast(data_a_sizes, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(data_b_sizes, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);	
+	MPI_Bcast(data_a_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(data_b_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(data_c_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(data_a_indices, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(data_b_indices, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(data_b_displs,  num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(data_c_displs, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+
 	
 	int my_a_size = data_a_sizes[my_rank];
 	int my_b_size = data_b_sizes[my_rank];
 	int my_c_size = my_a_size + my_b_size;
-	int* recv_a_buffer = (int*)malloc(my_a_size);
-	int* recv_b_buffer = (int*)malloc(my_b_size);
+	int* recv_a_buffer = (int*)malloc(my_a_size * sizeof(int));
+	int* recv_b_buffer = (int*)malloc(my_b_size * sizeof(int));
 
 	MPI_Scatterv(data_a, data_a_sizes, data_a_indices, MPI_INT, recv_a_buffer, my_a_size, MPI_INT, FIRST, MPI_COMM_WORLD);
 	MPI_Scatterv(data_b, data_b_sizes, data_b_displs, MPI_INT, recv_b_buffer, my_b_size, MPI_INT, FIRST, MPI_COMM_WORLD);
 	MPI_Barrier(MPI_COMM_WORLD);
 	// I believe we can free arrays A and B now
+	//free(data_a);
+	//free(data_b);
 
-	printf("[%d]: ", my_rank);
-	print_array(recv_a_buffer, my_a_size, "My A: ");
-	printf("[%d]: ", my_rank);
-	print_array(recv_b_buffer, my_b_size, "My B: ");
+	//printf("[%d]: ", my_rank);
+	//print_array(recv_a_buffer, my_a_size, "My A: ");
+	//printf("[%d]: ", my_rank);
+	//print_array(recv_b_buffer, my_b_size, "My B: ");
 
 	int* my_data_c = (int*)malloc(my_c_size * sizeof(int));
 
@@ -240,20 +247,23 @@ int main (int argc, char *argv[]) {
 	// I don't know how to calculate j() in parallel without
 	// copying the entire B array for every process
 	merge_arrays(recv_a_buffer, recv_b_buffer, my_data_c, my_a_size, my_b_size);
-	print_array(my_data_c, my_c_size, "My C: ");
+	//print_array(my_data_c, my_c_size, "My C: ");
 
 	if (my_rank == FIRST) {
 		// only the first element needs a valid receive buffer
 		data_c = (int*)malloc((data_size * 2) * sizeof(int)); // A and B are same length
 	}
+	else {
+		data_c = NULL;
+	}
 	MPI_Gatherv(my_data_c, my_c_size, MPI_INT, data_c, data_c_sizes, data_c_displs, MPI_INT, FIRST, MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	if (my_rank == FIRST) {
-		print_array(data_c_sizes, num_procs, "C sizes: ");
-		print_array(data_c_displs, num_procs, "C displs: ");
+		//print_array(data_c_sizes, num_procs, "C sizes: ");
+		//print_array(data_c_displs, num_procs, "C displs: ");
 		print_array(data_c, data_size*2, "C: ");
 	}
-	
 	MPI_Finalize();
 
 	return 0;
