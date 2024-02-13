@@ -29,8 +29,8 @@ void partition_array(int data_size, int num_procs, int* chunks) {
 	*  add to them until the remainder
 	*  is 0					*/
 	
-	int remainder = data_size % num_procs;
-	int initial = data_size / num_procs;
+	int remainder	= data_size % num_procs;
+	int initial	= data_size / num_procs;
 
 	for (int i = 0; i < num_procs; i++) {
 		chunks[i] = initial;
@@ -177,7 +177,7 @@ int main (int argc, char *argv[]) {
 		for (i = 0; i < num_procs; i++) {
 			// calculate A indices
 			data_a_indices[i] = sum;
-			sum += data_a_sizes[i];
+			sum		  += data_a_sizes[i];
 		}
 		// Insert given message to appropriate location
 		// Change to MPI Broadcast?
@@ -187,54 +187,54 @@ int main (int argc, char *argv[]) {
 
 		int previous_index = -1; //j()
 		for (i = 0; i < num_procs; i++) {
-			int cur_idx = data_a_indices[i];
-			int cur_size = data_a_sizes[i];
-			data_b_displs[i] = previous_index + 1; //displacements should start at 0 but indices are the max indices
-			data_b_indices[i] = find_b_index(data_a[cur_idx + cur_size - 1], data_b, previous_index + 1, data_size);
-			previous_index = data_b_indices[i];
+			int cur_idx		= data_a_indices[i];
+			int cur_size		= data_a_sizes[i];
+			data_b_displs[i]	= previous_index + 1; //displacements should start at 0 but indices are the max indices
+			data_b_indices[i]	= find_b_index(data_a[cur_idx + cur_size - 1], data_b, previous_index + 1, data_size);
+			previous_index		= data_b_indices[i];
 		}
 
 		int prev = -1; //first size includes 0
 		for (i = 0; i < num_procs; i++) {
 			data_b_sizes[i] = data_b_indices[i] - prev;
-			prev = data_b_indices[i];
+			prev		= data_b_indices[i];
 		}
 		
 		// data c sizes
 		int previous_c_displs = 0;
 		for (i = 0; i < num_procs; i++) {
-			int cur_size = data_a_sizes[i] + data_b_sizes[i];
-			data_c_sizes[i] = cur_size;
-			data_c_displs[i] = previous_c_displs;
-			previous_c_displs += cur_size;
+			int cur_size		= data_a_sizes[i] + data_b_sizes[i];
+			data_c_sizes[i]		= cur_size;
+			data_c_displs[i]	= previous_c_displs;
+			previous_c_displs	+= cur_size;
 		}
 		
 		//print_array(data_b_indices, num_procs, "j() indices: ");
 		//print_array(data_b_sizes, num_procs, "j() sizes: ");
 
 	}
-	MPI_Barrier(MPI_COMM_WORLD);	
 	MPI_Bcast(data_a_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(data_b_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(data_c_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(data_a_indices, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(data_b_indices, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(data_b_displs,  num_procs, MPI_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(data_c_displs, num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(data_c_displs,  num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);	
 
 	
-	int my_a_size = data_a_sizes[my_rank];
-	int my_b_size = data_b_sizes[my_rank];
-	int my_c_size = my_a_size + my_b_size;
-	int* recv_a_buffer = (int*)malloc(my_a_size * sizeof(int));
-	int* recv_b_buffer = (int*)malloc(my_b_size * sizeof(int));
+	int my_a_size		= data_a_sizes[my_rank];
+	int my_b_size		= data_b_sizes[my_rank];
+	int my_c_size		= my_a_size + my_b_size;
+	int* recv_a_buffer	= (int*)malloc(my_a_size * sizeof(int));
+	int* recv_b_buffer	= (int*)malloc(my_b_size * sizeof(int));
 
 	MPI_Scatterv(data_a, data_a_sizes, data_a_indices, MPI_INT, recv_a_buffer, my_a_size, MPI_INT, FIRST, MPI_COMM_WORLD);
-	MPI_Scatterv(data_b, data_b_sizes, data_b_displs, MPI_INT, recv_b_buffer, my_b_size, MPI_INT, FIRST, MPI_COMM_WORLD);
+	MPI_Scatterv(data_b, data_b_sizes, data_b_displs,  MPI_INT, recv_b_buffer, my_b_size, MPI_INT, FIRST, MPI_COMM_WORLD);
 	MPI_Barrier(MPI_COMM_WORLD);
 	// I believe we can free arrays A and B now
-	//free(data_a);
-	//free(data_b);
+	free(data_a);
+	free(data_b);
 
 	//printf("[%d]: ", my_rank);
 	//print_array(recv_a_buffer, my_a_size, "My A: ");
