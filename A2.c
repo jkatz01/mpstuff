@@ -5,11 +5,7 @@
 #define RAND_INC 6
 #define FIRST    0
 
-enum Tags {
-	TAG_CHUNK_START,
-	TAG_CHUNK_END
-};
-
+/* Generates two arrays of semi-random numbers */
 void generate_arrays(int* data_a, int* data_b, int size) {
 	int cur_a = 0;
 	int cur_b = 0;
@@ -21,14 +17,8 @@ void generate_arrays(int* data_a, int* data_b, int size) {
 	}
 }
 
+/* Partitions an array into as balanced as possible chunks */
 void partition_array(int data_size, int num_procs, int* chunks) {
-	/* chunk_sizes must have total num of procs elements
-	
-	*  determine the size of each 
-	*  chunk, and then incrementally
-	*  add to them until the remainder
-	*  is 0					*/
-	
 	int remainder	= data_size % num_procs;
 	int initial	= data_size / num_procs;
 
@@ -42,6 +32,7 @@ void partition_array(int data_size, int num_procs, int* chunks) {
 
 }
 
+/* Prints an array with a prefix */
 void print_array(int* data, int size, const char* prefix) {
 	printf("%s", prefix);
 	for (int i = 0; i < size; i++) {
@@ -53,6 +44,8 @@ void print_array(int* data, int size, const char* prefix) {
 	printf("\n");
 }
 
+/* Finds an index j that is the greatest value in data_b
+ * that is >= max_a					*/
 int find_b_index(int max_a, int* data_b, int start, int b_size) {
 	// uses binary search to find the greated j
 	// that is smaller or equal to max_a
@@ -88,6 +81,7 @@ int find_b_index(int max_a, int* data_b, int start, int b_size) {
 	return low-1;
 }
 
+/* Merges two sorted arrays into one */
 void merge_arrays(const int* data_a, const int* data_b, int* data_c, int a_size, int b_size) {
 	int k = 0;
 	int i = 0;
@@ -135,7 +129,7 @@ int main (int argc, char *argv[]) {
 	int*	data_b_sizes;
 	int*	data_c_sizes;
 	int*	data_a_indices;
-	int*	data_b_indices; //equivalent to j() in algorithm
+	int*	data_b_indices;
 	int*	data_b_displs;
 	int*	data_c_displs;
 
@@ -175,15 +169,9 @@ int main (int argc, char *argv[]) {
 		int sum = 0;
 		int i = 0;
 		for (i = 0; i < num_procs; i++) {
-			// calculate A indices
 			data_a_indices[i] = sum;
 			sum		  += data_a_sizes[i];
 		}
-		// Insert given message to appropriate location
-		// Change to MPI Broadcast?
-		//
-		//print_array(data_a, data_size, "A: ");
-		//print_array(data_b, data_size, "B: ");
 
 		int previous_index = -1; //j()
 		for (i = 0; i < num_procs; i++) {
@@ -208,11 +196,9 @@ int main (int argc, char *argv[]) {
 			data_c_displs[i]	= previous_c_displs;
 			previous_c_displs	+= cur_size;
 		}
-		
-		//print_array(data_b_indices, num_procs, "j() indices: ");
-		//print_array(data_b_sizes, num_procs, "j() sizes: ");
 
 	}
+
 	MPI_Bcast(data_a_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(data_b_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(data_c_sizes,   num_procs, MPI_INT, 0, MPI_COMM_WORLD);
@@ -232,14 +218,6 @@ int main (int argc, char *argv[]) {
 	MPI_Scatterv(data_a, data_a_sizes, data_a_indices, MPI_INT, recv_a_buffer, my_a_size, MPI_INT, FIRST, MPI_COMM_WORLD);
 	MPI_Scatterv(data_b, data_b_sizes, data_b_displs,  MPI_INT, recv_b_buffer, my_b_size, MPI_INT, FIRST, MPI_COMM_WORLD);
 	MPI_Barrier(MPI_COMM_WORLD);
-	// I believe we can free arrays A and B now
-	free(data_a);
-	free(data_b);
-
-	//printf("[%d]: ", my_rank);
-	//print_array(recv_a_buffer, my_a_size, "My A: ");
-	//printf("[%d]: ", my_rank);
-	//print_array(recv_b_buffer, my_b_size, "My B: ");
 
 	int* my_data_c = (int*)malloc(my_c_size * sizeof(int));
 
@@ -247,7 +225,6 @@ int main (int argc, char *argv[]) {
 	// I don't know how to calculate j() in parallel without
 	// copying the entire B array for every process
 	merge_arrays(recv_a_buffer, recv_b_buffer, my_data_c, my_a_size, my_b_size);
-	//print_array(my_data_c, my_c_size, "My C: ");
 
 	if (my_rank == FIRST) {
 		// only the first element needs a valid receive buffer
@@ -260,37 +237,10 @@ int main (int argc, char *argv[]) {
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	if (my_rank == FIRST) {
-		//print_array(data_c_sizes, num_procs, "C sizes: ");
-		//print_array(data_c_displs, num_procs, "C displs: ");
-		print_array(data_c, data_size*2, "C: ");
+		//print_array(data_c, data_size*2, "C: ");
 	}
 	MPI_Finalize();
 
 	return 0;
 
-	// TODO: use proper logging instead of printing to console
-	// TODO: free arrays as soon as possible when appropriate
-
-	// Partition A into r groups
-	// each with k = logn elements
-	// Group 1: A[1]	... A[k]
-	// Group 2: A[k+1]	... A[2k]
-	// Group i: A[(i-1)k+1]	... A[ik]
-	// Group r: A[(r-1)k+1]	... A[rk]
-	//
-	// Find r integers j(1) ... j(r)
-	// j(1) is greatest index so A[k]  >= B[j(1)]
-	// j(2) is greatest index so A[2k] >= B[j(2)]
-	// j(i) is greatest index so A[ik] >= B[j(i)]
-	// j(r) is greatest index so A[rk] >= B[j(r)]
-	//
-	// This partitions B into r groups
-	// b[1]	      ...b[j(1)], b[j(1)+1]  ...b[j(2)]
-	// b[j(i-1)+1]...b[j(i)], b[j(r-1)+1]...b[j(r)]
-	//
-	// Assign processor i to merge group i of A 
-	//			     & group i of B
-	//
-	// This guarantees that the elments of B have
-	// reached their final position in C(1:2n)
 }
