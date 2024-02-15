@@ -116,12 +116,12 @@ void merge_arrays(const int* data_a, const int* data_b, int* data_c, int a_size,
 }
 
 int main (int argc, char *argv[]) {
-	int	my_rank;
-	int	num_procs;
-	int	source;
-	int	dest;
-	int	data_size;
-	int	k;
+	int		my_rank;
+	int		num_procs;
+	int		source;
+	int		dest;
+	int		data_size;
+	int		k;
 	int*	data_a;
 	int*	data_b;
 	int*	data_c;
@@ -132,6 +132,8 @@ int main (int argc, char *argv[]) {
 	int*	data_b_indices;
 	int*	data_b_displs;
 	int*	data_c_displs;
+	double	start_time;
+	double 	end_time;
 
 	if (argc != 2) {
 		data_size = 10;
@@ -156,6 +158,9 @@ int main (int argc, char *argv[]) {
 	data_b_displs  = (int*)malloc(num_procs * sizeof(int));
 	data_c_sizes   = (int*)malloc(num_procs * sizeof(int));
 	data_c_displs  = (int*)malloc(num_procs * sizeof(int));
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	start_time = MPI_Wtime();
 	
 	if (my_rank == FIRST) {
 
@@ -235,8 +240,10 @@ int main (int argc, char *argv[]) {
 	}
 	MPI_Gatherv(my_data_c, my_c_size, MPI_INT, data_c, data_c_sizes, data_c_displs, MPI_INT, FIRST, MPI_COMM_WORLD);
 	MPI_Barrier(MPI_COMM_WORLD);
+	end_time = MPI_Wtime();
 
 	if (my_rank == FIRST) {
+		printf("Time Elapsed : %lf\n", end_time - start_time);
 		//print_array(data_c, data_size*2, "C: ");
 	}
 	MPI_Finalize();
